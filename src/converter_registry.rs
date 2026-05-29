@@ -101,11 +101,59 @@ gen_direct_property_converter!(rot_velocity, "RotVelocity", "AngularVelocity");
 gen_direct_property_converter!(locked, "Locked", "Locked");
 gen_direct_property_converter!(cast_shadow, "CastShadow", "CastShadows");
 gen_direct_property_converter!(field_of_view, "FieldOfView", "FOV");
+gen_direct_property_converter!(gui_enabled, "Enabled", "Visible");
+gen_direct_property_converter!(gui_display_order, "DisplayOrder", "ZIndex");
+
+fn convert_property_part_material(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::Enum(material) = rbxl_instance.properties.get(&ustr("Material")).unwrap() else { return poly_instance; };
+    let new_material: u32 = match material.to_u32() {
+        848 => 1,
+        816 => 2,
+        1344 => 3,
+        3 => 4,
+        1280 => 5,
+        1536 => 6,
+        784 => 7,
+        1088 => 8,
+        // 0 => 9, <-- no metal grid equivalent
+        1056 => 10,
+        288 => 11,
+        528 => 12,
+        256 => 13,
+        // 0 => 14, <-- no plywood equivalent
+        1040 => 15,
+        1296 => 16,
+        912 => 17,
+        272 => 0,
+        1328 => 18,
+        820 => 19, // i don't have a close equivalent to stone, just put limestone ig
+        512 => 20,
+        _ => 17
+    };
+
+    poly_instance.properties.insert(ustr("Material"), poly::PolyProperty::Enum(new_material));
+    poly_instance
+}
+
+fn convert_property_part_shape(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::Enum(part_shape) = rbxl_instance.properties.get(&ustr("Shape")).unwrap() else { return poly_instance; };
+    let new_shape: u32 = match part_shape.to_u32() {
+        0 => 1,
+        1 => 0,
+        2 => 2,
+        3 => 4,
+        4 => 5,
+        _ => 0
+    };
+
+    poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(new_shape));
+    poly_instance
+}
 
 fn convert_property_cframe(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::CFrame(cframe) = rbxl_instance.properties.get(&ustr("CFrame")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("Position"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.position.x, y: cframe.position.y, z: cframe.position.z }));
-    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.orientation.x.x, y: cframe.orientation.x.y, z: cframe.orientation.x.z }));
+    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.orientation.y.x, y: cframe.orientation.z.y, z: cframe.orientation.x.z })); // why is it off by 1 degree sometimes??? i just put random parts of the matrix cuz me no get
     poly_instance
 }
 
@@ -126,13 +174,7 @@ fn convert_property_part_color(mut poly_instance: poly::PolyInstance, rbxl_insta
 fn convert_property_team_color(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::BrickColor(brick_color) = rbxl_instance.properties.get(&ustr("TeamColor")).unwrap() else { return poly_instance; };
     let color = brick_color.to_color3uint8();
-
-    let mut target_color = poly::poly_properties::Color { r: color.r as f32 / 256.0, g: color.g as f32 / 256.0, b: color.b as f32 / 256.0, a: 1.0 };
-
-    if poly_instance.properties.contains_key(&ustr("Color")) {
-        let poly::PolyProperty::Color(existing_color) = &poly_instance.properties[&ustr("Color")] else { return poly_instance; };
-        target_color.a = existing_color.a;
-    }
+    let target_color = poly::poly_properties::Color { r: color.r as f32 / 256.0, g: color.g as f32 / 256.0, b: color.b as f32 / 256.0, a: 1.0 };
 
     poly_instance.properties.insert(ustr("Color"), poly::PolyProperty::Color(target_color));
     poly_instance
@@ -163,17 +205,23 @@ fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance
 
 // CLASS-PROPERTY CONVERTERS
 
-gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency);
+gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material, part_shape);
+gen_direct_class_property_converter!(shapeless_part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material);
 gen_direct_class_property_converter!(workspace, gravity);
 gen_direct_class_property_converter!(camera, field_of_view);
 gen_direct_class_property_converter!(team, team_color);
 
+gen_direct_class_property_converter!(screen_gui, gui_enabled, gui_display_order);
+
 // CLASS CONVERTERS
 
-gen_direct_class_converter!{part, "Part"}
-gen_direct_class_converter!{workspace, "Environment"}
-gen_direct_class_converter!{camera, "Camera"}
-gen_direct_class_converter!{team, "Team"}
+gen_direct_class_converter!(part, "Part");
+gen_direct_propertyless_class_converter!(model, "Model");
+gen_direct_class_converter!(workspace, "Environment");
+gen_direct_class_converter!(camera, "Camera");
+gen_direct_class_converter!(team, "Team");
+
+gen_direct_class_converter!(screen_gui, "GUI");
 
 gen_direct_propertyless_class_converter!(none, "[none]");
 gen_direct_propertyless_class_converter!(data_model, "World");
@@ -191,11 +239,34 @@ fn convert_class_spawn_location(mut poly_instance: poly::PolyInstance, rbxl_inst
     poly_instance
 }
 
+fn convert_class_truss_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    poly_instance.class_name = ustr("Part");
+    poly_instance = shapeless_part_properties(poly_instance, rbxl_instance); // inherits part, but doesn't replicate shape
+    poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(8));
+    poly_instance
+}
+
+fn convert_class_wedge_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    poly_instance.class_name = ustr("Part");
+    poly_instance = shapeless_part_properties(poly_instance, rbxl_instance); // inherits part, but doesn't replicate shape
+    poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(4));
+
+    // rotate 90 degrees on y axis because it's formatted differently :sob:
+    let poly::PolyProperty::Vector3(mut rotation) = poly_instance.properties.get(&ustr("Rotation")).unwrap().clone() else { return poly_instance; };
+    rotation.y += 90.0;
+    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(rotation));
+
+    poly_instance
+}
+
 // YIPPEE
 
 pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
     let class_converter: HashMap<ustr::Ustr, Arc<Iconverter>> = HashMap::from([
         (ustr("Part"), Arc::new(convert_class_part) as Arc<Iconverter>),
+        (ustr("TrussPart"), Arc::new(convert_class_truss_part) as Arc<Iconverter>),
+        (ustr("WedgePart"), Arc::new(convert_class_wedge_part) as Arc<Iconverter>),
+        (ustr("Model"), Arc::new(convert_class_model) as Arc<Iconverter>),
         (ustr("Camera"), Arc::new(convert_class_camera) as Arc<Iconverter>),
         (ustr("SpawnLocation"), Arc::new(convert_class_spawn_location) as Arc<Iconverter>),
         (ustr("Team"), Arc::new(convert_class_team) as Arc<Iconverter>),
@@ -208,7 +279,9 @@ pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
         (ustr("ServerStorage"), Arc::new(convert_class_server_storage) as Arc<Iconverter>),
         (ustr("Players"), Arc::new(convert_class_players) as Arc<Iconverter>),
         (ustr("Teams"), Arc::new(convert_class_teams) as Arc<Iconverter>),
+
         (ustr("StarterGui"), Arc::new(convert_class_starter_gui) as Arc<Iconverter>),
+        (ustr("ScreenGui"), Arc::new(convert_class_screen_gui) as Arc<Iconverter>),
     ]);
     
     let invalid_class: Arc<Iconverter> = Arc::new(convert_class_none) as Arc<Iconverter>;
