@@ -56,11 +56,35 @@ macro_rules! gen_direct_class_converter {
     };
 }
 
+macro_rules! gen_direct_class_property_converter {
+    ($f_name:tt,$($item:expr),*) => {
+        paste! {
+            fn [<$f_name _properties>](mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+            $(
+                poly_instance = [<convert_property_ $item>](poly_instance, rbxl_instance);
+            )*
+                poly_instance
+            }
+        }
+    }
+}
+
 macro_rules! gen_direct_property_converter {
     ($f_name:tt,$rbxl_property_name:tt,$property_name:tt) => {
         paste! {
             fn [<convert_property_ $f_name>](mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
                 poly_instance.properties.insert(ustr($property_name), direct_rbxl_variant_to_poly_property(rbxl_instance.properties.get(&ustr($rbxl_property_name)).unwrap().clone()));
+                poly_instance
+            }
+        }
+    };
+}
+
+macro_rules! gen_direct_propertyless_class_converter {
+    ($f_name:tt,$class_name:tt) => {
+        paste! {
+            fn [<convert_class_ $f_name>](mut poly_instance: poly::PolyInstance, _: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+                poly_instance.class_name = ustr($class_name);
                 poly_instance
             }
         }
@@ -99,6 +123,21 @@ fn convert_property_part_color(mut poly_instance: poly::PolyInstance, rbxl_insta
     poly_instance
 }
 
+fn convert_property_team_color(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::BrickColor(brick_color) = rbxl_instance.properties.get(&ustr("TeamColor")).unwrap() else { return poly_instance; };
+    let color = brick_color.to_color3uint8();
+
+    let mut target_color = poly::poly_properties::Color { r: color.r as f32 / 256.0, g: color.g as f32 / 256.0, b: color.b as f32 / 256.0, a: 1.0 };
+
+    if poly_instance.properties.contains_key(&ustr("Color")) {
+        let poly::PolyProperty::Color(existing_color) = &poly_instance.properties[&ustr("Color")] else { return poly_instance; };
+        target_color.a = existing_color.a;
+    }
+
+    poly_instance.properties.insert(ustr("Color"), poly::PolyProperty::Color(target_color));
+    poly_instance
+}
+
 fn convert_property_part_transparency(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::Float32(transparency) = rbxl_instance.properties.get(&ustr("Transparency")).unwrap() else { return poly_instance; };
 
@@ -124,45 +163,26 @@ fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance
 
 // CLASS-PROPERTY CONVERTERS
 
-fn part_properties(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
-    poly_instance = convert_property_cframe(poly_instance, rbxl_instance);
-    poly_instance = convert_property_size(poly_instance, rbxl_instance);
-    poly_instance = convert_property_velocity(poly_instance, rbxl_instance);
-    poly_instance = convert_property_rot_velocity(poly_instance, rbxl_instance);
-    poly_instance = convert_property_anchored(poly_instance, rbxl_instance);
-    poly_instance = convert_property_can_collide(poly_instance, rbxl_instance);
-    poly_instance = convert_property_cast_shadow(poly_instance, rbxl_instance);
-    poly_instance = convert_property_locked(poly_instance, rbxl_instance);
-    poly_instance = convert_property_part_color(poly_instance, rbxl_instance);
-    poly_instance = convert_property_part_transparency(poly_instance, rbxl_instance);
-    poly_instance
-}
-
-fn workspace_properties(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
-    poly_instance = convert_property_gravity(poly_instance, rbxl_instance);
-    poly_instance
-}
-
-fn camera_properties(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
-    poly_instance = convert_property_field_of_view(poly_instance, rbxl_instance);
-    poly_instance
-}
+gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency);
+gen_direct_class_property_converter!(workspace, gravity);
+gen_direct_class_property_converter!(camera, field_of_view);
+gen_direct_class_property_converter!(team, team_color);
 
 // CLASS CONVERTERS
 
 gen_direct_class_converter!{part, "Part"}
 gen_direct_class_converter!{workspace, "Environment"}
 gen_direct_class_converter!{camera, "Camera"}
+gen_direct_class_converter!{team, "Team"}
 
-fn convert_class_none(mut poly_instance: poly::PolyInstance, _: &rbx_dom_weak::Instance) -> poly::PolyInstance {
-    poly_instance.class_name = ustr("[none]");
-    poly_instance
-}
-
-fn convert_class_data_model(mut poly_instance: poly::PolyInstance, _: &rbx_dom_weak::Instance) -> poly::PolyInstance {
-    poly_instance.class_name = ustr("World");
-    poly_instance
-}
+gen_direct_propertyless_class_converter!(none, "[none]");
+gen_direct_propertyless_class_converter!(data_model, "World");
+gen_direct_propertyless_class_converter!(script_service, "ScriptService");
+gen_direct_propertyless_class_converter!(replicated, "Hidden");
+gen_direct_propertyless_class_converter!(server_storage, "ServerHidden");
+gen_direct_propertyless_class_converter!(players, "Players");
+gen_direct_propertyless_class_converter!(teams, "Teams");
+gen_direct_propertyless_class_converter!(starter_gui, "PlayerGUI");
 
 fn convert_class_spawn_location(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     poly_instance.class_name = ustr("Part");
@@ -176,10 +196,19 @@ fn convert_class_spawn_location(mut poly_instance: poly::PolyInstance, rbxl_inst
 pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
     let class_converter: HashMap<ustr::Ustr, Arc<Iconverter>> = HashMap::from([
         (ustr("Part"), Arc::new(convert_class_part) as Arc<Iconverter>),
-        (ustr("Workspace"), Arc::new(convert_class_workspace) as Arc<Iconverter>),
-        (ustr("DataModel"), Arc::new(convert_class_data_model) as Arc<Iconverter>),
         (ustr("Camera"), Arc::new(convert_class_camera) as Arc<Iconverter>),
-        (ustr("SpawnLocation"), Arc::new(convert_class_spawn_location) as Arc<Iconverter>)
+        (ustr("SpawnLocation"), Arc::new(convert_class_spawn_location) as Arc<Iconverter>),
+        (ustr("Team"), Arc::new(convert_class_team) as Arc<Iconverter>),
+
+        (ustr("DataModel"), Arc::new(convert_class_data_model) as Arc<Iconverter>),
+        (ustr("Workspace"), Arc::new(convert_class_workspace) as Arc<Iconverter>),
+        (ustr("ServerScriptService"), Arc::new(convert_class_script_service) as Arc<Iconverter>),
+        (ustr("ReplicatedStorage"), Arc::new(convert_class_replicated) as Arc<Iconverter>),
+        (ustr("ReplicatedFirst"), Arc::new(convert_class_replicated) as Arc<Iconverter>),
+        (ustr("ServerStorage"), Arc::new(convert_class_server_storage) as Arc<Iconverter>),
+        (ustr("Players"), Arc::new(convert_class_players) as Arc<Iconverter>),
+        (ustr("Teams"), Arc::new(convert_class_teams) as Arc<Iconverter>),
+        (ustr("StarterGui"), Arc::new(convert_class_starter_gui) as Arc<Iconverter>),
     ]);
     
     let invalid_class: Arc<Iconverter> = Arc::new(convert_class_none) as Arc<Iconverter>;
