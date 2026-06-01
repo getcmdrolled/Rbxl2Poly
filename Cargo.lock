@@ -13,6 +13,7 @@ dependencies = [
  "rbx_binary",
  "rbx_dom_weak",
  "rbx_types",
+ "rbx_xml",
  "ruzstd",
  "serde",
  "serde_json",
@@ -596,6 +597,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rbx_xml"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0cbaf53b44c9cc0fad1e5dc8ac63fb32fa0ecaa26d32b269cebe4dca8b7b4de"
+dependencies = [
+ "ahash",
+ "base64",
+ "log",
+ "rbx_dom_weak",
+ "rbx_reflection",
+ "rbx_reflection_database",
+ "xml-rs",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1091,6 +1107,12 @@ dependencies = [
  "unicode-xid",
  "wasmparser",
 ]
+
+[[package]]
+name = "xml-rs"
+version = "0.8.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae8337f8a065cfc972643663ea4279e04e7256de865aa66fe25cec5fb912d3f"
 
 [[package]]
 name = "zerocopy"

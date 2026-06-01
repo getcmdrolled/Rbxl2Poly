@@ -15,8 +15,11 @@ use ustr::{Ustr, ustr};
 
 fn main() -> Result<()> {
     let argument = args().nth(1).with_context(|| "No file provided!")?;
-    let input = BufReader::new(File::open(argument).with_context(|| "Unable to read file")?);
-    let dom = rbx_binary::from_reader(input).with_context(|| "No DOM in provided file")?;
+    let mut input = BufReader::new(File::open(argument).with_context(|| "Unable to read file")?);
+    let dom;
+    dom = rbx_binary::from_reader(&mut input).unwrap_or_else(|_err| {
+        rbx_xml::from_reader(&mut input, rbx_xml::DecodeOptions::default()).with_context(|| "Unable to parse file, not rbxl or rbxlx").unwrap()
+    });
 
     let poly_instance = rbxl_to_poly_instance(dom.root(), &dom);
 
