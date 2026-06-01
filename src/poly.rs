@@ -17,6 +17,7 @@ pub enum PolyProperty {
   Vector2(poly_properties::Vector2),
   Vector3(poly_properties::Vector3),
   Number(f32),
+  Ref(Uuid),
 }
 
 #[derive(Clone, Debug)]

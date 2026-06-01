@@ -1,4 +1,4 @@
-use crate::poly;
+use crate::{asset_handler, poly};
 use std::{collections::HashMap, sync::Arc};
 use paste::paste;
 use ustr::ustr;
@@ -206,7 +206,7 @@ fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance
 // CLASS-PROPERTY CONVERTERS
 
 gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material, part_shape);
-gen_direct_class_property_converter!(shapeless_part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material);
+gen_direct_class_property_converter!(base_part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material);
 gen_direct_class_property_converter!(workspace, gravity);
 gen_direct_class_property_converter!(camera, field_of_view);
 gen_direct_class_property_converter!(team, team_color);
@@ -241,14 +241,24 @@ fn convert_class_spawn_location(mut poly_instance: poly::PolyInstance, rbxl_inst
 
 fn convert_class_truss_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     poly_instance.class_name = ustr("Part");
-    poly_instance = shapeless_part_properties(poly_instance, rbxl_instance); // inherits part, but doesn't replicate shape
-    poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(8));
+    poly_instance = base_part_properties(poly_instance, rbxl_instance);
+    poly_instance
+}
+
+fn convert_class_mesh_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    poly_instance.class_name = ustr("Mesh");
+    poly_instance = base_part_properties(poly_instance, rbxl_instance);
+    poly_instance.properties.insert(ustr("UsePartColor"), poly::PolyProperty::Boolean(true));
+
+    let rbx_dom_weak::types::Variant::Content(content) = rbxl_instance.properties.get(&ustr("MeshContent")).unwrap() else { return poly_instance; };
+    poly_instance.properties.insert(ustr("Asset"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(content.clone(), ustr("PTMeshAsset"))));
+
     poly_instance
 }
 
 fn convert_class_wedge_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     poly_instance.class_name = ustr("Part");
-    poly_instance = shapeless_part_properties(poly_instance, rbxl_instance); // inherits part, but doesn't replicate shape
+    poly_instance = base_part_properties(poly_instance, rbxl_instance);
     poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(4));
 
     // rotate 90 degrees on y axis because it's formatted differently :sob:
@@ -266,6 +276,7 @@ pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
         (ustr("Part"), Arc::new(convert_class_part) as Arc<Iconverter>),
         (ustr("TrussPart"), Arc::new(convert_class_truss_part) as Arc<Iconverter>),
         (ustr("WedgePart"), Arc::new(convert_class_wedge_part) as Arc<Iconverter>),
+        (ustr("MeshPart"), Arc::new(convert_class_mesh_part) as Arc<Iconverter>),
         (ustr("Model"), Arc::new(convert_class_model) as Arc<Iconverter>),
         (ustr("Camera"), Arc::new(convert_class_camera) as Arc<Iconverter>),
         (ustr("SpawnLocation"), Arc::new(convert_class_spawn_location) as Arc<Iconverter>),

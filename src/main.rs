@@ -1,5 +1,6 @@
 pub mod poly;
 pub mod converter_registry;
+pub mod asset_handler;
 
 use rbx_binary;
 use rbx_dom_weak;
@@ -7,6 +8,7 @@ use std::fs::{File, write};
 use std::io::BufReader;
 use std::env::args;
 use serde_json::json;
+use colored::Colorize;
 use anyhow::{Context, Result};
 use ruzstd;
 use ustr::{Ustr, ustr};
@@ -17,19 +19,25 @@ fn main() -> Result<()> {
     let dom = rbx_binary::from_reader(input).with_context(|| "No DOM in provided file")?;
 
     let poly_instance = rbxl_to_poly_instance(dom.root(), &dom);
+
+    let mut assets: Vec<poly::PolyInstance> = Vec::new();
+    for i in asset_handler::assets.lock().unwrap().iter() {
+        println!("{} Asset {:?} needs to be uploaded to polytoria.", "[WARN]:".yellow(), i.0.clone().into_value());
+        assets.push(i.1.clone());
+    }
+
     let poly_json = json!({
-        "Version": "2.0.9",
+        "Version": "2.0.12",
         "FileType": 0,
         "Objects": [
             &poly_instance
         ],
-        "NonInstanceObjects": []
+        "NonInstanceObjects": assets
     });
 
     let trimmed_poly_json_string = poly_json.to_string().replace(",null", "").replace("null", ""); // why do i have to trim the nulls, just let me not add them in the first place :sob:
     let compressed = ruzstd::encoding::compress_to_vec(trimmed_poly_json_string.as_bytes(), ruzstd::encoding::CompressionLevel::Fastest);
     write("main.poly", compressed).expect("Unable to write output file");
-    println!("This tool is still in very early stages, so it is designed to only generate the main.poly. Please add this to a blank project, and your rbxl content should (mostly) be there.");
     Ok(())
 }
 
@@ -65,9 +73,9 @@ fn rbxl_to_poly_instance(rbxl_instance: &rbx_dom_weak::Instance, dom: &rbx_dom_w
 pub fn convert_class(rbxl_instance: &rbx_dom_weak::Instance, mut poly_instance: poly::PolyInstance) -> poly::PolyInstance {
   let class: Ustr = rbxl_instance.class.clone();
   poly_instance = converter_registry::get_converter_for_class(class).as_ref()(poly_instance, rbxl_instance);
-  if poly_instance.class_name == ustr("[none]") {
-    println!("[DEBUG] Failed to parse class \"{}\", ignoring.", class);
-  }
+  //if poly_instance.class_name == ustr("[none]") {
+  //  println!("[DEBUG] Failed to parse class \"{}\", ignoring.", class);
+  //}
 
   return poly_instance;
 }
