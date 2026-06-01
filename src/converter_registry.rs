@@ -153,7 +153,23 @@ fn convert_property_part_shape(mut poly_instance: poly::PolyInstance, rbxl_insta
 fn convert_property_cframe(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::CFrame(cframe) = rbxl_instance.properties.get(&ustr("CFrame")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("Position"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.position.x, y: cframe.position.y, z: cframe.position.z }));
-    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.orientation.y.x, y: cframe.orientation.z.y, z: cframe.orientation.x.z })); // why is it off by 1 degree sometimes??? i just put random parts of the matrix cuz me no get
+
+    // rotation conversion to euler angles logic, stolen: https://github.com/rblx-godot/rblx-godot/blob/master/src/userdata/cframe.rs#L410
+    let sy: f32 = (cframe.orientation.x.x * cframe.orientation.x.x + cframe.orientation.y.y * cframe.orientation.y.y).sqrt();
+
+    let xrot: f32;
+    let yrot: f32 = -cframe.orientation.z.x.atan2(sy);
+    let zrot: f32;
+
+    if sy < 1e-6 {
+        xrot = cframe.orientation.z.y.atan2(cframe.orientation.z.z);
+        zrot = cframe.orientation.y.x.atan2(cframe.orientation.x.x);
+    } else {
+        xrot = cframe.orientation.y.z.atan2(cframe.orientation.y.y);
+        zrot = 0.0;
+    }
+
+    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: xrot, y: yrot, z: zrot }));
     poly_instance
 }
 
@@ -207,6 +223,7 @@ fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance
 
 gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material, part_shape);
 gen_direct_class_property_converter!(base_part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material);
+gen_direct_class_property_converter!(model, cframe, size);
 gen_direct_class_property_converter!(workspace, gravity);
 gen_direct_class_property_converter!(camera, field_of_view);
 gen_direct_class_property_converter!(team, team_color);
@@ -216,7 +233,7 @@ gen_direct_class_property_converter!(screen_gui, gui_enabled, gui_display_order)
 // CLASS CONVERTERS
 
 gen_direct_class_converter!(part, "Part");
-gen_direct_propertyless_class_converter!(model, "Model");
+gen_direct_class_converter!(model, "Model");
 gen_direct_class_converter!(workspace, "Environment");
 gen_direct_class_converter!(camera, "Camera");
 gen_direct_class_converter!(team, "Team");
