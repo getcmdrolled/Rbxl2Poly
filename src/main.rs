@@ -5,7 +5,7 @@ pub mod asset_handler;
 use rbx_binary;
 use rbx_dom_weak;
 use std::fs::{File, write};
-use std::io::BufReader;
+use std::io::{BufReader, Error, Read, Seek};
 use std::env::args;
 use serde_json::json;
 use colored::Colorize;
@@ -15,11 +15,18 @@ use ustr::{Ustr, ustr};
 
 fn main() -> Result<()> {
     let argument = args().nth(1).with_context(|| "No file provided!")?;
-    let mut input = BufReader::new(File::open(argument).with_context(|| "Unable to read file")?);
-    let dom;
-    dom = rbx_binary::from_reader(&mut input).unwrap_or_else(|_err| {
-        rbx_xml::from_reader(&mut input, rbx_xml::DecodeOptions::default()).with_context(|| "Unable to parse file, not rbxl or rbxlx").unwrap()
-    });
+    let mut file = File::open(argument).with_context(|| "Unable to read file")?;
+    let mut header = vec![0;8];
+    file.read_exact(&mut header)?;
+    file.seek(std::io::SeekFrom::Start(0))?;
+    let header_string = String::from_utf8(header).unwrap_or_default();
+    
+    let input = BufReader::new(file);
+    let dom = match header_string.as_str() {
+        "<roblox!" => rbx_binary::from_reader(input).with_context(|| "Unable to parse as rbxl").unwrap(),
+        "<roblox " => rbx_xml::from_reader_default(input).with_context(|| "Unable to parse as rbxlx").unwrap(),
+        _ => return Err(Error::new(std::io::ErrorKind::InvalidData, "File given seemingly not rbxl[x]").into())
+    };
 
     let poly_instance = rbxl_to_poly_instance(dom.root(), &dom);
 
