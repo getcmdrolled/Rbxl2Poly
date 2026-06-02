@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.102"
 colored = "3.1.1"
+glam = "0.33.0"
 lazy_static = "1.5.0"
 paste = "1.0.15"
 rbx_binary = "2.0.1"

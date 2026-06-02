@@ -2,8 +2,28 @@ use crate::{asset_handler, poly};
 use std::{collections::HashMap, sync::Arc};
 use paste::paste;
 use ustr::ustr;
+use glam;
 
 // UTIL
+
+pub fn matrix_to_euler_angles(orientation: rbx_types::Matrix3) -> (f32, f32, f32) {
+    let matrix = glam::Mat3 { x_axis: glam::Vec3 {
+        x: orientation.x.x,
+        y: orientation.y.x,
+        z: orientation.z.x
+    }, y_axis: glam::Vec3 {
+        x: orientation.x.y,
+        y: orientation.y.y,
+        z: orientation.z.y
+    }, z_axis: glam::Vec3 {
+        x: orientation.x.z,
+        y: orientation.y.z,
+        z: orientation.z.z
+    }};
+    let euler = matrix.to_euler(glam::EulerRot::YXZ);
+
+    return (-euler.1.to_degrees(), euler.0.to_degrees(), euler.2.to_degrees())
+}
 
 type Iconverter = dyn Fn(poly::PolyInstance, &rbx_dom_weak::Instance) -> poly::PolyInstance;
 
@@ -135,6 +155,12 @@ fn convert_property_part_material(mut poly_instance: poly::PolyInstance, rbxl_in
     poly_instance
 }
 
+fn convert_property_model_scale(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::Float32(scale) = rbxl_instance.properties.get(&ustr("Scale")).unwrap() else { return poly_instance; };
+    poly_instance.properties.insert(ustr("Size"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: *scale, y: *scale, z: *scale }));
+    poly_instance
+}
+
 fn convert_property_part_shape(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::Enum(part_shape) = rbxl_instance.properties.get(&ustr("Shape")).unwrap() else { return poly_instance; };
     let new_shape: u32 = match part_shape.to_u32() {
@@ -152,24 +178,18 @@ fn convert_property_part_shape(mut poly_instance: poly::PolyInstance, rbxl_insta
 
 fn convert_property_cframe(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::CFrame(cframe) = rbxl_instance.properties.get(&ustr("CFrame")).unwrap() else { return poly_instance; };
-    poly_instance.properties.insert(ustr("Position"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: cframe.position.x, y: cframe.position.y, z: cframe.position.z }));
+    poly_instance.properties.insert(ustr("Position"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: -cframe.position.x, y: cframe.position.y, z: -cframe.position.z }));
+    let rot = matrix_to_euler_angles(cframe.orientation);
 
-    // rotation conversion to euler angles logic, stolen: https://github.com/rblx-godot/rblx-godot/blob/master/src/userdata/cframe.rs#L410
-    let sy: f32 = (cframe.orientation.x.x * cframe.orientation.x.x + cframe.orientation.y.y * cframe.orientation.y.y).sqrt();
+    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: rot.0, y: rot.1, z: rot.2 }));
+    poly_instance
+}
 
-    let xrot: f32;
-    let yrot: f32 = -cframe.orientation.z.x.atan2(sy);
-    let zrot: f32;
-
-    if sy < 1e-6 {
-        xrot = cframe.orientation.z.y.atan2(cframe.orientation.z.z);
-        zrot = cframe.orientation.y.x.atan2(cframe.orientation.x.x);
-    } else {
-        xrot = cframe.orientation.y.z.atan2(cframe.orientation.y.y);
-        zrot = 0.0;
-    }
-
-    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: xrot, y: yrot, z: zrot }));
+fn convert_property_world_pivot(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::CFrame(cframe) = rbxl_instance.properties.get(&ustr("WorldPivotData")).unwrap() else { return poly_instance; };
+    poly_instance.properties.insert(ustr("Position"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: -cframe.position.x, y: cframe.position.y, z: -cframe.position.z }));
+    let rot = matrix_to_euler_angles(cframe.orientation);
+    poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(poly::poly_properties::Vector3 { x: rot.0, y: rot.1, z: rot.2 }));
     poly_instance
 }
 
@@ -223,7 +243,7 @@ fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance
 
 gen_direct_class_property_converter!(part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material, part_shape);
 gen_direct_class_property_converter!(base_part, cframe, size, velocity, rot_velocity, anchored, can_collide, cast_shadow, locked, part_color, part_transparency, part_material);
-gen_direct_class_property_converter!(model, cframe, size);
+gen_direct_class_property_converter!(model, world_pivot, model_scale);
 gen_direct_class_property_converter!(workspace, gravity);
 gen_direct_class_property_converter!(camera, field_of_view);
 gen_direct_class_property_converter!(team, team_color);
@@ -259,6 +279,7 @@ fn convert_class_spawn_location(mut poly_instance: poly::PolyInstance, rbxl_inst
 fn convert_class_truss_part(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     poly_instance.class_name = ustr("Part");
     poly_instance = base_part_properties(poly_instance, rbxl_instance);
+    poly_instance.properties.insert(ustr("Shape"), poly::PolyProperty::Enum(8));
     poly_instance
 }
 
@@ -270,6 +291,11 @@ fn convert_class_mesh_part(mut poly_instance: poly::PolyInstance, rbxl_instance:
     let rbx_dom_weak::types::Variant::Content(content) = rbxl_instance.properties.get(&ustr("MeshContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("Asset"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(content.clone(), ustr("PTMeshAsset"))));
 
+    // halve size it's formatted differently :sob:
+    let poly::PolyProperty::Vector3(mut size) = poly_instance.properties.get(&ustr("Size")).unwrap().clone() else { return poly_instance; };
+    size = poly::poly_properties::Vector3 { x: size.x / 2.0, y: size.y / 2.0, z: size.z / 2.0 };
+    poly_instance.properties.insert(ustr("Size"), poly::PolyProperty::Vector3(size));
+    
     poly_instance
 }
 
@@ -280,7 +306,7 @@ fn convert_class_wedge_part(mut poly_instance: poly::PolyInstance, rbxl_instance
 
     // rotate 90 degrees on y axis because it's formatted differently :sob:
     let poly::PolyProperty::Vector3(mut rotation) = poly_instance.properties.get(&ustr("Rotation")).unwrap().clone() else { return poly_instance; };
-    rotation.y += 90.0;
+    rotation.y -= 90.0;
     poly_instance.properties.insert(ustr("Rotation"), poly::PolyProperty::Vector3(rotation));
 
     poly_instance
