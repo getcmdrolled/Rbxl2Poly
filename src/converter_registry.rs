@@ -262,6 +262,7 @@ gen_direct_class_converter!(screen_gui, "GUI");
 
 gen_direct_propertyless_class_converter!(none, "[none]");
 gen_direct_propertyless_class_converter!(data_model, "World");
+gen_direct_propertyless_class_converter!(folder, "Folder");
 gen_direct_propertyless_class_converter!(script_service, "ScriptService");
 gen_direct_propertyless_class_converter!(replicated, "Hidden");
 gen_direct_propertyless_class_converter!(server_storage, "ServerHidden");
@@ -321,6 +322,7 @@ pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
         (ustr("WedgePart"), Arc::new(convert_class_wedge_part) as Arc<Iconverter>),
         (ustr("MeshPart"), Arc::new(convert_class_mesh_part) as Arc<Iconverter>),
         (ustr("Model"), Arc::new(convert_class_model) as Arc<Iconverter>),
+        (ustr("Folder"), Arc::new(convert_class_folder) as Arc<Iconverter>),
         (ustr("Camera"), Arc::new(convert_class_camera) as Arc<Iconverter>),
         (ustr("SpawnLocation"), Arc::new(convert_class_spawn_location) as Arc<Iconverter>),
         (ustr("Team"), Arc::new(convert_class_team) as Arc<Iconverter>),
