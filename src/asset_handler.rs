@@ -5,11 +5,17 @@ use uuid::Uuid;
 
 use crate::poly::PolyInstance;
 
-lazy_static! {
-    pub static ref assets: Mutex<HashMap<rbx_types::Content, PolyInstance>> = Mutex::new(HashMap::new());
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+pub enum Content {
+    Content(rbx_types::Content),
+    ContentId(rbx_types::ContentId),
 }
 
-pub fn get_or_instantiate_asset(content: rbx_types::Content, class_name: Ustr) -> Uuid {
+lazy_static! {
+    pub static ref assets: Mutex<HashMap<Content, PolyInstance>> = Mutex::new(HashMap::new());
+}
+
+pub fn get_or_instantiate_asset(content: Content, class_name: Ustr) -> Uuid {
     let mut unwrapped_assets = assets.lock().unwrap();
     if unwrapped_assets.contains_key(&content) {
         unwrapped_assets.get(&content).unwrap().clone().id

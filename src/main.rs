@@ -32,7 +32,7 @@ fn main() -> Result<()> {
 
     let mut assets: Vec<poly::PolyInstance> = Vec::new();
     for i in asset_handler::assets.lock().unwrap().iter() {
-        println!("{} Asset {:?} needs to be uploaded to polytoria.", "[WARN]:".yellow(), i.0.clone().into_value());
+        println!("{} Asset {:?} needs to be uploaded to polytoria.", "[WARN]:".yellow(), i.0.clone());
         assets.push(i.1.clone());
     }
 
