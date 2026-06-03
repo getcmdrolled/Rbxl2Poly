@@ -1,4 +1,3 @@
 /target
 main.poly
-*.rbxl
-*.rbxlx
+*.rbxl*
