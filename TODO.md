@@ -1,12 +1,27 @@
 # TODO
-- GUI elements
-- Decal and SurfaceGUI
-    - [#635](https://github.com/Polytoria/polytoria-game/issues/635) needs to be implemented first
-- Lighting elements
-    - PointLight, SpotLight need something similar to [#635](https://github.com/Polytoria/polytoria-game/issues/635)
-    - SurfaceLight unimplementable
-    - Brightness property of Lighting needs to be converted to a SunLight object, additional indirect conversion needed
-- Scripts
-    - Seperate cargo library for lexing ([luau-lexer](https://docs.rs/luau-lexer/latest/luau_lexer/)?) and rewriting scripts
-- Players, StarterPack, StarterPlayer
-    - cannot be directly converted due to property overlap
+- [x] Root (DataModel)
+- [x] Workspace
+- [x] Parts
+    - [x] WedgePart/MeshPart/TrussPart/SpawnLocation
+- [x] Camera
+- [x] Teams
+- [x] Folders & Models
+- [x] Asset Handling
+- [ ] GUI elements
+    - [x] StarterGUI
+    - [x] ScreenGUI
+    - [x] Frame
+    - [ ] TextLabel/Button
+    - [ ] UICorner
+- [ ] Indirect conversion system, needed for lighting and players/starterpack/starterplayer
+- [ ] Players, StarterPack, StarterPlayer
+    - [ ] cannot be directly converted due to property overlap
+- [ ] Scripts
+    - [ ] Seperate cargo library for lexing ([luau-lexer](https://docs.rs/luau-lexer/latest/luau_lexer/)?) and script rewriter
+- [ ] Decal and SurfaceGUI
+    - [ ] [JustBorgar's idea](https://github.com/Polytoria/polytoria-game/issues/702#issuecomment-4713068573) needs to be implemented first
+- [ ] Lighting elements
+    - [x] Sky/skybox
+    - [ ] Brightness property of Lighting needs to be converted to a SunLight object
+    - [ ] PointLight, SpotLight need something similar to decals
+    - [ ] SurfaceLights have no equivalent

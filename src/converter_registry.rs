@@ -130,9 +130,16 @@ gen_direct_property_converter!(rot_velocity, "RotVelocity", "AngularVelocity");
 gen_direct_property_converter!(locked, "Locked", "Locked");
 gen_direct_property_converter!(cast_shadow, "CastShadow", "CastShadows");
 gen_direct_property_converter!(field_of_view, "FieldOfView", "FOV");
+gen_direct_property_converter!(ambient, "Ambient", "AmbientColor");
 gen_direct_property_converter!(gui_enabled, "Enabled", "Visible");
 gen_direct_property_converter!(gui_display_order, "DisplayOrder", "ZIndex");
-gen_direct_property_converter!(ambient, "Ambient", "AmbientColor");
+gen_direct_property_converter!(gui_visible, "Visible", "Visible");
+gen_direct_property_converter!(gui_rotation, "Rotation", "Rotation");
+gen_direct_property_converter!(gui_clips_descendants, "ClipsDescendants", "ClipDescendants");
+gen_direct_property_converter!(gui_anchor_point, "AnchorPoint", "PivotPoint");
+gen_direct_property_converter!(gui_zindex, "ZIndex", "ZIndex");
+gen_direct_property_converter!(gui_border_size_pixel, "BorderSizePixel", "BorderWidth");
+gen_direct_property_converter!(gui_border_color, "BorderColor3", "BorderColor");
 
 fn convert_property_part_material(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::Enum(material) = rbxl_instance.properties.get(&ustr("Material")).unwrap() else { return poly_instance; };
@@ -242,10 +249,58 @@ fn convert_property_part_transparency(mut poly_instance: poly::PolyInstance, rbx
     poly_instance
 }
 
+fn convert_property_gui_background_color(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::Color3(color) = rbxl_instance.properties.get(&ustr("BackgroundColor3")).unwrap() else { return poly_instance; };
+
+    let mut target_color = poly::poly_properties::Color { r: color.r, g: color.g, b: color.b, a: 1.0 };
+
+    if poly_instance.properties.contains_key(&ustr("Color")) {
+        let poly::PolyProperty::Color(existing_color) = &poly_instance.properties[&ustr("Color")] else { return poly_instance; };
+        target_color.a = existing_color.a;
+    }
+
+    poly_instance.properties.insert(ustr("Color"), poly::PolyProperty::Color(target_color));
+    poly_instance
+}
+
+fn convert_property_gui_background_transparency(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::Float32(transparency) = rbxl_instance.properties.get(&ustr("BackgroundTransparency")).unwrap() else { return poly_instance; };
+
+    let mut target_color = poly::poly_properties::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - transparency };
+
+    if poly_instance.properties.contains_key(&ustr("Color")) {
+        let poly::PolyProperty::Color(existing_color) = &poly_instance.properties[&ustr("Color")] else { return poly_instance; };
+        target_color.r = existing_color.r;
+        target_color.g = existing_color.g;
+        target_color.b = existing_color.b;
+    }
+
+    poly_instance.properties.insert(ustr("Color"), poly::PolyProperty::Color(target_color));
+    poly_instance
+}
+
 fn convert_property_gravity(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     let rbx_dom_weak::types::Variant::Float32(existing_gravity) = rbxl_instance.properties.get(&ustr("Gravity")).unwrap() else { return poly_instance; };
     let new_property: poly::PolyProperty = poly::PolyProperty::Vector3(poly::poly_properties::Vector3 {x: 0.0, y: *existing_gravity / -2.308235294, z: 0.0});
     poly_instance.properties.insert(ustr("Gravity"), new_property);
+    poly_instance
+}
+
+fn convert_property_gui_position(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::UDim2(position) = rbxl_instance.properties.get(&ustr("Position")).unwrap() else { return poly_instance; };
+    let offset_property: poly::PolyProperty = poly::PolyProperty::Vector2(poly::poly_properties::Vector2 {x: position.x.offset as f32, y: position.y.offset as f32});
+    let relative_property: poly::PolyProperty = poly::PolyProperty::Vector2(poly::poly_properties::Vector2 {x: position.x.scale, y: position.y.scale});
+    poly_instance.properties.insert(ustr("PositionOffset"), offset_property);
+    poly_instance.properties.insert(ustr("PositionRelative"), relative_property);
+    poly_instance
+}
+
+fn convert_property_gui_size(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
+    let rbx_dom_weak::types::Variant::UDim2(size) = rbxl_instance.properties.get(&ustr("Size")).unwrap() else { return poly_instance; };
+    let offset_property: poly::PolyProperty = poly::PolyProperty::Vector2(poly::poly_properties::Vector2 {x: size.x.offset as f32, y: size.y.offset as f32});
+    let relative_property: poly::PolyProperty = poly::PolyProperty::Vector2(poly::poly_properties::Vector2 {x: size.x.scale, y: size.y.scale});
+    poly_instance.properties.insert(ustr("SizeOffset"), offset_property);
+    poly_instance.properties.insert(ustr("SizeRelative"), relative_property);
     poly_instance
 }
 
@@ -260,6 +315,7 @@ gen_direct_class_property_converter!(team, team_color);
 gen_direct_class_property_converter!(workspace, gravity);
 
 gen_direct_class_property_converter!(screen_gui, gui_enabled, gui_display_order);
+gen_direct_class_property_converter!(frame, gui_visible, gui_rotation, gui_clips_descendants, gui_anchor_point, gui_zindex, gui_border_size_pixel, gui_position, gui_size, gui_background_color, gui_background_transparency, gui_border_color);
 
 // CLASS CONVERTERS
 
@@ -279,6 +335,7 @@ gen_direct_propertyless_class_converter!(teams, "Teams");
 gen_direct_propertyless_class_converter!(starter_gui, "PlayerGUI");
 
 gen_direct_class_converter!(screen_gui, "GUI");
+gen_direct_class_converter!(frame, "UIView");
 
 gen_direct_propertyless_class_converter!(none, "[none]");
 
@@ -336,17 +393,17 @@ fn convert_class_lighting(mut poly_instance: poly::PolyInstance, rbxl_instance: 
 fn convert_class_sky(mut poly_instance: poly::PolyInstance, rbxl_instance: &rbx_dom_weak::Instance) -> poly::PolyInstance {
     poly_instance.class_name = ustr("ImageSky");
     
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxFt")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxFrontContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("FrontImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxBk")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxBackContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("BackImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxUp")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxUpContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("TopImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxDn")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxDownContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("BottomImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxRt")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxRightContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("RightImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
-    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxLf")).unwrap() else { return poly_instance; };
+    let rbx_dom_weak::types::Variant::ContentId(content) = rbxl_instance.properties.get(&ustr("SkyboxLeftContent")).unwrap() else { return poly_instance; };
     poly_instance.properties.insert(ustr("LeftImage"), poly::PolyProperty::Ref(asset_handler::get_or_instantiate_asset(asset_handler::Content::ContentId(content.clone()), ustr("PTImageAsset"))));
 
     poly_instance
@@ -378,6 +435,7 @@ pub fn get_converter_for_class(class_name: ustr::Ustr) -> Arc<Iconverter> {
         (ustr("StarterGui"), Arc::new(convert_class_starter_gui) as Arc<Iconverter>),
 
         (ustr("ScreenGui"), Arc::new(convert_class_screen_gui) as Arc<Iconverter>),
+        (ustr("Frame"), Arc::new(convert_class_frame) as Arc<Iconverter>),
 
         (ustr("Sky"), Arc::new(convert_class_sky) as Arc<Iconverter>),
     ]);
